@@ -48,24 +48,24 @@ Odoo controller routes.
 
 To use it, you must:
 
--  Create an ``auth.jwt.validator`` record to configure how the JWT
-   token will be validated.
--  Add an ``auth="jwt_{validator-name}"`` or
-   ``auth="public_or_jwt_{validator-name}"`` attribute to the routes you
-   want to protect where ``{validator-name}`` corresponds to the name
-   attribute of the JWT validator record.
+- Create an ``auth.jwt.validator`` record to configure how the JWT token
+  will be validated.
+- Add an ``auth="jwt_{validator-name}"`` or
+  ``auth="public_or_jwt_{validator-name}"`` attribute to the routes you
+  want to protect where ``{validator-name}`` corresponds to the name
+  attribute of the JWT validator record.
 
 The ``auth_jwt_demo`` module provides examples.
 
 The JWT validator can be configured with the following properties:
 
--  ``name``: the validator name, to match the
-   ``auth="jwt_{validator-name}"`` route property.
--  ``audience``: a comma-separated list of allowed audiences, used to
-   validate the ``aud`` claim.
--  ``issuer``: used to validate the ``iss`` claim.
--  Signature type (secret or public key), algorithm, secret and JWK URI
-   are used to validate the token signature.
+- ``name``: the validator name, to match the
+  ``auth="jwt_{validator-name}"`` route property.
+- ``audience``: a comma-separated list of allowed audiences, used to
+  validate the ``aud`` claim.
+- ``issuer``: used to validate the ``iss`` claim.
+- Signature type (secret or public key), algorithm, secret and JWK URI
+  are used to validate the token signature.
 
 In addition, the ``exp`` claim is validated to reject expired tokens.
 
@@ -135,7 +135,8 @@ Authors
 Contributors
 ------------
 
--  Stéphane Bidoul <stephane.bidoul@acsone.eu>
+- Stéphane Bidoul <stephane.bidoul@acsone.eu>
+- Mohamed Alkobrosli <malkobrosly@kencove.com>
 
 Maintainers
 -----------

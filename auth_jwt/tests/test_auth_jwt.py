@@ -201,7 +201,7 @@ class TestAuthMethod(TransactionCase):
             self.assertEqual(
                 str(composite_error.exception),
                 "401 Unauthorized: "
-                + "Multiple errors occurred during JWT chain validation:\n"
+                "Multiple errors occurred during JWT chain validation:\n"
                 "validator: 401 Unauthorized: "
                 "The server could not verify that you are authorized to "
                 "access the URL requested. You either supplied the wrong "
