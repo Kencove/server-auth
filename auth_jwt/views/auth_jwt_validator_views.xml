@@ -40,6 +40,11 @@
                                 invisible="signature_type != 'public_key'"
                                 required="signature_type == 'public_key'"
                             />
+                            <field
+                                name="provider_id"
+                                invisible="partner_id_strategy != 'username'"
+                                required="partner_id_strategy == 'username'"
+                            />
                         </group>
                         <group colspan="2" string="User">
                             <field name="user_id_strategy" />

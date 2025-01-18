@@ -8,6 +8,7 @@ from calendar import timegm
 from functools import partial
 
 import jwt  # pylint: disable=missing-manifest-dependency
+import requests
 from jwt import PyJWKClient
 from werkzeug.exceptions import InternalServerError
 
@@ -65,14 +66,26 @@ class AuthJwtValidator(models.Model):
         default="RS256",
     )
     audience = fields.Char(
-        required=True, help="Comma separated list of audiences, to validate aud."
+        required=False, help="Comma separated list of audiences, to validate aud."
+    )
+    scopes = fields.Char(
+        required=False, help="Comma separated list of scopes, to validate scope."
+    )
+    groups = fields.Char(
+        required=False,
+        help="Comma separated list of groups, to validate group membership.",
     )
     issuer = fields.Char(required=True, help="To validate iss.")
     user_id_strategy = fields.Selection(
         [("static", "Static")], required=True, default="static"
     )
     static_user_id = fields.Many2one("res.users", default=1)
-    partner_id_strategy = fields.Selection([("email", "From email claim")])
+    partner_id_strategy = fields.Selection(
+        [
+            ("email", "From email claim"),
+            ("username", "From encrypted username claim"),
+        ]
+    )
     partner_id_required = fields.Boolean()
 
     next_validator_id = fields.Many2one(
@@ -96,6 +109,12 @@ class AuthJwtValidator(models.Model):
     )
     cookie_secure = fields.Boolean(
         default=True, help="Set to false only for development without https."
+    )
+
+    provider_id = fields.Many2one(
+        "auth.oauth.provider",
+        # domain="[('client_id', '=', 'qei6trmgkhjrpsbkk74s8277s')]",
+        domain="[('jwks_uri', '=', public_key_jwk_uri)]",
     )
 
     _sql_constraints = [
@@ -160,7 +179,7 @@ class AuthJwtValidator(models.Model):
 
     @tools.ormcache("self.public_key_jwk_uri", "kid")
     def _get_key(self, kid):
-        jwks_client = PyJWKClient(self.public_key_jwk_uri, cache_keys=False)
+        jwks_client = PyJWKClient(self.public_key_jwk_uri)
         return jwks_client.get_signing_key(kid).key
 
     def _encode(self, payload, secret, expire):
@@ -200,14 +219,29 @@ class AuthJwtValidator(models.Model):
                 key=key,
                 algorithms=[algorithm],
                 options=dict(
-                    require=["exp", "aud", "iss"],
+                    require=["exp", "iss"],
                     verify_exp=True,
-                    verify_aud=True,
                     verify_iss=True,
                 ),
-                audience=self.audience.split(","),
                 issuer=self.issuer,
             )
+            if len(self.audience) > 0:
+                if (payload.get("client_id") in (self.audience).split(",")) or (
+                    payload.get("aud") in self.audience.split(",")
+                ):
+                    return payload
+                else:
+                    raise UnauthorizedInvalidToken()
+            if len(self.scopes) > 0:
+                if payload.get("scope") in (self.scopes).split(","):
+                    return payload
+                else:
+                    raise UnauthorizedInvalidToken()
+            if len(self.groups) > 0:
+                if payload.get("group") in (self.groups).split(","):
+                    return payload
+                else:
+                    raise UnauthorizedInvalidToken()
         except Exception as e:
             _logger.info("Invalid token: %s", e)
             raise UnauthorizedInvalidToken() from e
@@ -225,7 +259,7 @@ class AuthJwtValidator(models.Model):
             raise InternalServerError()
         return uid
 
-    def _get_partner_id(self, payload):
+    def _get_partner_id(self, payload, authorization_header=None):
         # override for additional strategies
         if self.partner_id_strategy == "email":
             email = payload.get("email")
@@ -237,9 +271,20 @@ class AuthJwtValidator(models.Model):
                 _logger.debug("%d partners found for email %s", len(partner), email)
                 return
             return partner.id
+        elif self.partner_id_strategy == "username":
+            response = requests.get(
+                self.provider_id.validation_endpoint,
+                headers={"Authorization": f"Bearer {authorization_header}"},
+                timeout=60,
+            )
+            response.raise_for_status()
+            userinfo_data = response.json()
+            email = userinfo_data.get("email")
+            partner = self.env["res.partner"].search([("email", "=", email)])
+            return partner.id
 
-    def _get_and_check_partner_id(self, payload):
-        partner_id = self._get_partner_id(payload)
+    def _get_and_check_partner_id(self, payload, authorization_header=None):
+        partner_id = self._get_partner_id(payload, authorization_header)
         if not partner_id and self.partner_id_required:
             raise UnauthorizedPartnerNotFound()
         return partner_id
